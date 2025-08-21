@@ -18,6 +18,7 @@ function loadSettings(){
     return JSON.parse(raw);
   }catch{ return null; }
 }
+
 function saveSettings(settings){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
@@ -28,9 +29,11 @@ function loadPresets(){
     return raw ? JSON.parse(raw) : [];
   }catch{ return []; }
 }
+
 function savePresets(presets){
   localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
 }
+
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
 // ---------- Number Wheel Component ----------
@@ -247,6 +250,7 @@ function computeTotalSeconds({exerciseSec:A, restSec:R, exercisesPerInterval:E, 
   const perInterval = (E*A) + Math.max(0, (E-1))*R; // no rest after last exercise
   return I * perInterval;
 }
+
 function updateTotalPreview(){
   const total = computeTotalSeconds(state.settings);
   // show under Start button as tooltip-ish
@@ -261,6 +265,7 @@ function refreshPresetsUI(){
   select.innerHTML = '<option value="">— Presets —</option>' + presets.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
   if(current) select.value = current;
 }
+
 function applySettings(s){
   state.settings = {...state.settings, ...s};
   wheels.exercise.setValue(state.settings.exerciseSec, false);
@@ -295,6 +300,7 @@ function startSession(){
   if(state.settings.keepAwake) requestWakeLock(true);
 
   const {exerciseSec, restSec, exercisesPerInterval, intervals} = state.settings;
+  console.log(state.settings);
   const now = Date.now();
 
   state.session = {
@@ -313,12 +319,20 @@ function startSession(){
   $('#summary').hidden = false; // keep hidden content structure valid, then hide content
   $('#summary').hidden = true;
 
-  if(state.settings.voiceOn) speak('Exercise starts in 3, 2, 1');
-  audio.countIn();
+  // make pause button act as Start initially
+  const pauseBtn = document.getElementById("pauseBtn");
+  pauseBtn.textContent = "Start";
+  pauseBtn.dataset.state = "start";
 
-  updateUI();
-  startTick();
-  maybeAskNotifications();
+  // if(state.settings.voiceOn) speak('Exercise starts in 3, 2, 1');
+  // audio.countIn();
+
+  setTimeout(() => {
+    updateUI();
+    startTick();
+    maybeAskNotifications();
+  }, 3000);
+  
 }
 
 function updateUI() {
@@ -359,6 +373,7 @@ function startTick(){
   stopTick();
   timerId = setInterval(tick, 100); // 100ms for smooth ring
 }
+
 function stopTick(){
   if(timerId){ clearInterval(timerId); timerId = null; }
 }
@@ -508,23 +523,50 @@ function updateRing(msLeft){
 }
 
 // ---------- Controls ----------
-function pauseResume(){
-  const s = state.session;
-  if(!s) return;
-  if(!s.paused){
-    s.paused = true;
-    s.pauseStart = Date.now();
-    stopTick();
-    $('#pauseBtn').textContent = 'Resume';
-    speak('Paused');
-  }else{
-    s.paused = false;
-    const pausedDur = Date.now() - s.pauseStart;
-    s.phaseEndsAt += pausedDur;
-    startTick();
-    $('#pauseBtn').textContent = 'Pause';
-    speak('Resuming');
+// function pauseResume(){
+//   const s = state.session;
+//   if(!s) return;
+//   if(!s.paused){
+//     s.paused = true;
+//     s.pauseStart = Date.now();
+//     stopTick();
+//     $('#pauseBtn').textContent = 'Resume';
+//     speak('Paused');
+//   }else{
+//     s.paused = false;
+//     const pausedDur = Date.now() - s.pauseStart;
+//     s.phaseEndsAt += pausedDur;
+//     startTick();
+//     $('#pauseBtn').textContent = 'Pause';
+//     speak('Resuming');
+//   }
+// }
+function pauseResume() {
+  document.getElementById("pauseBtn").addEventListener("click", function () {
+    console.log(this.dataset.state);
+  if (this.dataset.state === "start") {
+    // First click: start workout
+    this.textContent = "Pause";
+    this.dataset.state = "pause";
+
+    // Voice countdown
+    speak("Exercise starts in 3, 2, 1");
+    setTimeout(() => {
+      startNextPhase(); // existing function in your code
+    }, 3000);
+
+  } else if (this.dataset.state === "pause") {
+    // Normal pause/resume toggle
+    if (isPaused) {
+      resumeTimer();
+      this.textContent = "Pause";
+    } else {
+      pauseTimer();
+      this.textContent = "Resume";
+    }
   }
+});
+
 }
 function skipPhase(){
   if(!state.session) return;
